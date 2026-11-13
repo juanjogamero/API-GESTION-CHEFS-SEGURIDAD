@@ -1,0 +1,22 @@
+name: Web · Laboratorio de seguridad
+on:
+  push:
+    branches: [main, feature/seguridad-portfolio-profesional]
+    paths: ["docs/**", "scripts/**", "README.md", ".github/workflows/demo.yml"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: node --check docs/security.js
+      - run: node scripts/check-demo.mjs
