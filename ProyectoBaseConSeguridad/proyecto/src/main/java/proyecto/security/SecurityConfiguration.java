@@ -1,16 +1,18 @@
 package proyecto.security;
 
-import java.util.List;
-
-import org.springframework.beans.factory.annotation.Autowired;
+import java.util.Arrays;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
@@ -22,87 +24,78 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @Configuration
 @EnableWebSecurity
 public class SecurityConfiguration {
+    private final JWTAuthenticationFilter jwtFilter;
 
-    @Autowired
-    private JWTAuthenticationFilter jwtAuthenticationFilter;
+    public SecurityConfiguration(JWTAuthenticationFilter jwtFilter) {
+        this.jwtFilter = jwtFilter;
+    }
+
+    @Bean PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(); }
 
     @Bean
-    AuthenticationManager authenticationManager(AuthenticationConfiguration authConf) throws Exception {
-        return authConf.getAuthenticationManager();
+    DaoAuthenticationProvider authenticationProvider(UserDetailsService userDetailsService,
+                                                     PasswordEncoder passwordEncoder) {
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider(userDetailsService);
+        provider.setPasswordEncoder(passwordEncoder);
+        return provider;
+    }
+
+    @Bean AuthenticationManager authenticationManager(AuthenticationConfiguration conf) throws Exception {
+        return conf.getAuthenticationManager();
     }
 
     @Bean
-    PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
-
-    @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        System.out.println("🔴 1. CARGANDO SEGURIDAD (Versión: A prueba de bombas)");
-
-        http
+    SecurityFilterChain filterChain(HttpSecurity http, DaoAuthenticationProvider provider) throws Exception {
+        return http
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .authenticationProvider(provider)
             .authorizeHttpRequests(auth -> auth
-                // --- 1. RUTAS PÚBLICAS ---
-                // Login
-                .requestMatchers("/login", "/auth/login").permitAll()
-                
-                // ===> AQUÍ ESTÁ EL CAMBIO <===
-                // Añadimos explícitamente "/chef" (sin barra), "/chef/" (con barra) y "/chef/**" (con cosas detrás)
-                .requestMatchers(HttpMethod.POST, "/chef", "/chef/", "/chef/**").permitAll() 
-                .requestMatchers(HttpMethod.POST, "/cliente", "/cliente/", "/cliente/**").permitAll()
-                
-                // Consultas públicas
-                .requestMatchers(HttpMethod.GET, "/chef/listadoActivos").permitAll()
-                .requestMatchers(HttpMethod.GET, "/chef/*").permitAll()
-                .requestMatchers("/noticia/**").permitAll()
-                
-                // Swagger
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-
-                // --- 2. RUTAS PRIVADAS ---
-                
-                // ADMIN
-                .requestMatchers("/admin/**").hasAuthority("ADMIN")
-                .requestMatchers(HttpMethod.GET, "/chef").hasAuthority("ADMIN") 
-                .requestMatchers(HttpMethod.GET, "/cliente/**").hasAuthority("ADMIN")
-                .requestMatchers(HttpMethod.PUT, "/banear/**", "/desbanear/**").hasAuthority("ADMIN")
-
-                // CHEF
-                .requestMatchers(HttpMethod.PUT, "/chef/**").hasAuthority("CHEF")
-                .requestMatchers(HttpMethod.DELETE, "/chef/**").hasAuthority("CHEF")
-                .requestMatchers("/chef/miPerfil", "/chef/activar", "/chef/desactivar").hasAuthority("CHEF")
-                .requestMatchers("/servicio/misServiciosChef").hasAuthority("CHEF")
-
-                // CLIENTE
-                .requestMatchers(HttpMethod.PUT, "/cliente/**").hasAuthority("CLIENTE")
-                .requestMatchers(HttpMethod.DELETE, "/cliente/**").hasAuthority("CLIENTE")
-                .requestMatchers("/cliente/miPerfil").hasAuthority("CLIENTE")
-                .requestMatchers("/servicio/contratar/**").hasAuthority("CLIENTE")
-                .requestMatchers("/servicio/puntuar/**").hasAuthority("CLIENTE")
-                .requestMatchers("/servicio/misServiciosCliente").hasAuthority("CLIENTE")
-
-                // --- 3. RESTO BLOQUEADO ---
-                .anyRequest().authenticated()
-            );
-
-        // Filtro activado
-        http.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
-
-        return http.build();
+                .requestMatchers(HttpMethod.POST, "/login").permitAll()
+                // Registro: solo POST sobre la colección, nunca POST /chef/{id}.
+                .requestMatchers(HttpMethod.POST, "/chef", "/cliente").permitAll()
+                .requestMatchers(HttpMethod.GET, "/chef/miPerfil").hasAuthority("CHEF")
+                .requestMatchers(HttpMethod.GET, "/cliente/miPerfil").hasAuthority("CLIENTE")
+                .requestMatchers(HttpMethod.GET, "/chef", "/chef/listadoActivos", "/chef/{id}").permitAll()
+                .requestMatchers(HttpMethod.GET, "/noticia", "/noticia/{id}").permitAll()
+                .requestMatchers(HttpMethod.PUT, "/banear/{actorId}", "/desbanear/{actorId}").hasAuthority("ADMIN")
+                .requestMatchers("/admin", "/admin/**").hasAuthority("ADMIN")
+                .requestMatchers(HttpMethod.GET, "/cliente", "/cliente/{id}").hasAuthority("ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/chef", "/chef/activar", "/chef/desactivar").hasAuthority("CHEF")
+                .requestMatchers(HttpMethod.DELETE, "/chef").hasAuthority("CHEF")
+                .requestMatchers(HttpMethod.PUT, "/cliente").hasAuthority("CLIENTE")
+                .requestMatchers(HttpMethod.DELETE, "/cliente").hasAuthority("CLIENTE")
+                .requestMatchers(HttpMethod.POST, "/noticia").hasAuthority("ADMIN")
+                .requestMatchers(HttpMethod.PUT, "/noticia/{id}").hasAuthority("ADMIN")
+                .requestMatchers(HttpMethod.DELETE, "/noticia/{id}").hasAuthority("ADMIN")
+                .requestMatchers(HttpMethod.POST, "/servicio/contratar/{chefId}").hasAuthority("CLIENTE")
+                .requestMatchers(HttpMethod.PUT, "/servicio/puntuar/{servicioId}/{puntuacion}").hasAuthority("CLIENTE")
+                .requestMatchers(HttpMethod.GET, "/servicio/misServiciosChef").hasAuthority("CHEF")
+                .requestMatchers(HttpMethod.GET, "/servicio/misServiciosCliente").hasAuthority("CLIENTE")
+                .anyRequest().denyAll()
+            )
+            .exceptionHandling(ex -> ex
+                .authenticationEntryPoint((req,res,e) -> res.sendError(401, "Autenticación requerida"))
+                .accessDeniedHandler((req,res,e) -> res.sendError(403, "Permisos insuficientes")))
+            .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+            .build();
     }
 
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(List.of("*"));
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("Authorization", "Content-Type"));
-        configuration.setAllowCredentials(true);
+    @Value("${app.cors.allowed-origins:http://localhost:3000}")
+    private String allowedOrigins;
+
+    @Bean CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration conf = new CorsConfiguration();
+        conf.setAllowedOrigins(Arrays.stream(allowedOrigins.split(","))
+            .map(String::trim).filter(s -> !s.isEmpty()).toList());
+        conf.setAllowedMethods(Arrays.asList("GET","POST","PUT","DELETE","OPTIONS"));
+        conf.setAllowedHeaders(Arrays.asList("Authorization","Content-Type"));
+        conf.setAllowCredentials(false);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/**", configuration);
+        source.registerCorsConfiguration("/**", conf);
         return source;
     }
 }
