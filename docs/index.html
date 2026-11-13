@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="es">
+<head>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width,initial-scale=1">
+ <meta name="theme-color" content="#101a22">
+ <meta name="description" content="Laboratorio interactivo de seguridad de API REST para gestión de chefs: JWT, roles, permisos y rutas protegidas.">
+ <meta property="og:title" content="ChefAccess · Laboratorio de seguridad">
+ <meta property="og:description" content="Explora las reglas de acceso ADMIN, CHEF y CLIENTE de una API REST educativa.">
+ <title>ChefAccess — Laboratorio de seguridad REST</title>
+ <link rel="icon" type="image/svg+xml" href="favicon.svg">
+ <link rel="preconnect" href="https://fonts.googleapis.com">
+ <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+ <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+ <link rel="stylesheet" href="styles.css">
+ <script defer src="security.js"></script>
+</head>
+<body>
+<svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+ <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 2 3 6v6c0 5.2 3.4 8.4 9 10 5.6-1.6 9-4.8 9-10V6l-9-4Z"/><path d="m8 12 3 3 5-6"/></symbol>
+ <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="8" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/><rect x="13" y="13" width="8" height="8" rx="1"/></symbol>
+ <symbol id="i-terminal" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="m6 8 4 4-4 4m6 0h6"/></symbol>
+ <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3 20v-2a6 6 0 0 1 12 0v2M16 5a3 3 0 0 1 0 6m1 3c2 0 4 2 4 5v1"/></symbol>
+ <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="5"/><path d="M12 12 22 2m-7 7 3 3m0-6 3 3"/></symbol>
+ <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></symbol>
+ <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10" width="14" height="12" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></symbol>
+ <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m16 16 5 5"/></symbol>
+ <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 5 5L20 7"/></symbol>
+ <symbol id="i-cross" viewBox="0 0 24 24"><path d="M5 5 19 19M19 5 5 19"/></symbol>
+ <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+ <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 11v6m0-10h.01"/></symbol>
+</svg>
+<div class="app-shell">
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-mark"><svg class="icon"><use href="#i-shield"/></svg></span>
+      <span><strong>ChefAccess<span>.</span></strong><small>SECURITY / LAB</small></span>
+    </div>
+    <div class="project-edition"><span class="dot"></span> PROYECTO ACADÉMICO</div>
+    <nav class="main-nav" aria-label="Secciones">
+      <div class="nav-label">ENTORNO</div>
+      <a href="#overview" class="selected"><svg class="icon"><use href="#i-grid"/></svg> Vista general</a>
+      <a href="#roles"><svg class="icon"><use href="#i-users"/></svg> Perfiles y permisos</a>
+      <a href="#endpoints"><svg class="icon"><use href="#i-terminal"/></svg> Explorador REST</a>
+      <a href="#token"><svg class="icon"><use href="#i-key"/></svg> Autenticación JWT</a>
+      <div class="nav-label nav-second">RECURSOS</div>
+      <a href="https://github.com/juanjogamero/API-GESTION-CHEFS-SEGURIDAD" target="_blank" rel="noopener noreferrer"><svg class="icon"><use href="#i-arrow"/></svg> Repositorio GitHub</a>
+      <a href="https://github.com/juanjogamero/API-GESTION-CHEFS-SEGURIDAD/tree/main/ProyectoBaseConSeguridad/proyecto" target="_blank" rel="noopener noreferrer"><svg class="icon"><use href="#i-lock"/></svg> Backend Java</a>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="side-mini-heading">SISTEMA</div>
+      <div class="online-row"><span class="online-dot"></span> Simulador listo</div>
+      <p>Interfaz educativa independiente de la API. No procesa credenciales ni tokens reales.</p>
+      <span class="stack">JAVA 17 / SPRING SECURITY / JWT</span>
+    </div>
+  </aside>
+  <div class="shell-content">
+    <header class="topbar">
+      <div class="breadcrumb">PROYECTO <span>/</span> <strong>SEGURIDAD DE API</strong></div>
+      <div class="topbar-links"><span class="edition">ENTORNO LOCAL SIMULADO</span><a href="https://github.com/juanjogamero/API-GESTION-CHEFS-SEGURIDAD" target="_blank" rel="noopener noreferrer">Código fuente <span aria-hidden="true">↗</span></a></div>
+    </header>
+    <main>
+      <section id="overview" class="overview" aria-labelledby="overview-title">
+        <div class="eyebrow"><span class="eyebrow-line"></span> CASO DE ESTUDIO / 01</div>
+        <div class="overview-body">
+          <div class="overview-copy">
+            <h1 id="overview-title">La seguridad<br><span>no es opcional.</span></h1>
+            <p>Una API REST para gestionar chefs y clientes, con autenticación JWT, control de roles y reglas de acceso que puedes explorar.</p>
+            <a href="#endpoints" class="hero-action">Probar permisos de la API <svg class="icon"><use href="#i-arrow"/></svg></a>
+          </div>
+          <div class="hero-diagram" aria-label="Esquema conceptual de autenticación JWT">
+            <div class="diagram-node node-client"><span>01 / CLIENTE</span><strong>Solicitud HTTP</strong><small>Authorization: Bearer ...</small></div>
+            <div class="diagram-connector"><span></span><svg class="icon"><use href="#i-arrow"/></svg></div>
+            <div class="diagram-node node-security"><span>02 / SPRING SECURITY</span><div class="node-shield"><svg class="icon"><use href="#i-shield"/></svg></div><strong>Verificación JWT</strong><small>Firma · Vigencia · Rol · Cuenta</small></div>
+            <div class="diagram-connector"><span></span><svg class="icon"><use href="#i-arrow"/></svg></div>
+            <div class="diagram-node node-api"><span>03 / API REST</span><strong>Acceso controlado</strong><small>200 / 401 / 403</small></div>
+          </div>
+        </div>
+        <div class="overview-foot"><span>SPRING BOOT 3.5</span><span>JAVA 17</span><span>JWT HS256</span><span>POSTGRESQL</span></div>
+      </section>
+
+      <div class="metric-strip">
+        <div><span>PERFILES DEFINIDOS</span><strong>03</strong><small>Admin, chef y cliente</small></div>
+        <div><span>INVITADOS</span><strong>01</strong><small>Acceso solo público</small></div>
+        <div><span>AUTENTICACIÓN</span><strong>JWT</strong><small>Token firmado y con caducidad</small></div>
+        <div><span>CONTRASEÑAS</span><strong>BCrypt</strong><small>Almacenamiento con hash</small></div>
+      </div>
+
+      <section id="roles" class="role-section" aria-labelledby="roles-title">
+        <div class="section-label">IDENTIDAD Y ACCESO <span> / 02</span></div>
+        <div class="section-heading">
+          <div><h2 id="roles-title">Explora los permisos</h2><p>Cambia de perfil y observa qué rutas de la API están disponibles.</p></div>
+          <span class="section-note"><svg class="icon"><use href="#i-info"/></svg> Reglas del backend representadas localmente</span>
+        </div>
+        <div class="security-panel">
+          <div class="panel-label">IDENTIDAD ACTIVA <span>SELECCIÓN INTERACTIVA</span></div>
+          <div id="role-selector" class="role-selector" role="group" aria-label="Seleccionar perfil">
+            <button data-role="INVITADO" type="button" aria-pressed="false"><span class="role-avatar">IN</span><span>Visitante<small>Sin autenticación</small></span></button>
+            <button data-role="CLIENTE" type="button" aria-pressed="true" class="is-current"><span class="role-avatar">CL</span><span>Cliente<small>Servicios y valoraciones</small></span></button>
+            <button data-role="CHEF" type="button" aria-pressed="false"><span class="role-avatar">CH</span><span>Chef<small>Perfil y disponibilidad</small></span></button>
+            <button data-role="ADMIN" type="button" aria-pressed="false"><span class="role-avatar">AD</span><span>Administrador<small>Gestión y bloqueos</small></span></button>
+          </div>
+          <div class="identity-controls">
+            <div><strong>Condiciones de seguridad</strong><span>Prueba qué ocurre con un token caducado o una cuenta bloqueada.</span></div>
+            <label class="switch-label"><input id="is-expired" type="checkbox"><span class="switch"></span> Token caducado</label>
+            <label class="switch-label"><input id="is-banned" type="checkbox"><span class="switch"></span> Cuenta baneada</label>
+          </div>
+        </div>
+      </section>
+
+      <section id="endpoints" class="endpoints-section" aria-labelledby="endpoints-title">
+        <div class="section-label">AUTORIZACIÓN <span> / 03</span></div>
+        <div class="section-heading">
+          <div><h2 id="endpoints-title">Explorador de endpoints</h2><p>Elige una ruta y consulta el resultado según el rol seleccionado.</p></div>
+          <span class="result-count" id="endpoint-count">13 rutas</span>
+        </div>
+        <div class="endpoint-workspace">
+          <div class="endpoint-list-pane">
+            <div class="endpoint-tools">
+              <label class="search" for="endpoint-search"><svg class="icon"><use href="#i-search"/></svg><input id="endpoint-search" placeholder="Buscar endpoint..." autocomplete="off"></label>
+              <select id="endpoint-filter" aria-label="Filtrar accesos"><option value="all">Todos</option><option value="allowed">Permitidos</option><option value="denied">Restringidos</option></select>
+            </div>
+            <div class="endpoint-table-head"><span>RUTA / MÉTODO</span><span>ESTADO</span></div>
+            <div id="endpoint-list" class="endpoint-list" role="listbox" tabindex="0" aria-label="Rutas disponibles"></div>
+          </div>
+          <div class="inspector-pane">
+            <div class="inspector-head"><span><span class="terminal-dot"></span> INSPECTOR DE RESPUESTA</span><span id="inspector-role">ROL: CLIENTE</span></div>
+            <div class="inspector-selected">
+              <span id="inspector-method" class="method-badge">GET</span>
+              <strong id="inspector-path">/chef</strong>
+            </div>
+            <p class="inspector-description" id="inspector-description">Consulta pública de chefs disponibles.</p>
+            <div class="response-meta"><span>RESULTADO PREVISTO</span><span id="inspector-status" class="status-code ok">200 OK</span></div>
+            <pre id="inspector-response" class="code-response" aria-live="polite"></pre>
+            <p class="inspector-disclaimer"><svg class="icon"><use href="#i-info"/></svg> Respuesta simulada según reglas del proyecto. No se envía ninguna petición a un servidor.</p>
+            <a href="https://github.com/juanjogamero/API-GESTION-CHEFS-SEGURIDAD/tree/main/ProyectoBaseConSeguridad/proyecto/src/main/java/proyecto/security" class="inspector-link" target="_blank" rel="noopener noreferrer">Ver reglas en Java <svg class="icon"><use href="#i-arrow"/></svg></a>
+          </div>
+        </div>
+      </section>
+
+      <section id="token" class="token-section" aria-labelledby="token-title">
+        <div class="section-label">TOKEN Y SESIÓN <span> / 04</span></div>
+        <div class="section-heading"><div><h2 id="token-title">¿Qué contiene el JWT?</h2><p>Un ejemplo de estructura de token, sin firma real ni información personal.</p></div></div>
+        <div class="token-grid">
+          <div class="token-code">
+            <div class="code-title"><span>JWT PAYLOAD · EJEMPLO</span><span class="code-indicator">NO VÁLIDO PARA AUTENTICAR</span></div>
+            <pre id="token-preview" aria-live="polite"></pre>
+          </div>
+          <div class="token-explainer">
+            <div class="explain-item"><span>01</span><div><strong>Inicio de sesión</strong><p>El servidor verifica la contraseña con BCrypt.</p></div></div>
+            <div class="explain-item"><span>02</span><div><strong>Firma y caducidad</strong><p>El token se firma con HS256 y una clave que no está en el repositorio.</p></div></div>
+            <div class="explain-item"><span>03</span><div><strong>Control en cada solicitud</strong><p>Se revisan firma, vigencia, rol y estado actual de la cuenta.</p></div></div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="page-foot">
+        <div><strong>ChefAccess.</strong><span>Proyecto académico de seguridad en servicios REST · DEMO sin conexión al servidor</span></div>
+        <a href="https://github.com/juanjogamero/API-GESTION-CHEFS-SEGURIDAD" target="_blank" rel="noopener noreferrer">Repositorio completo ↗</a>
+      </footer>
+    </main>
+  </div>
+</div>
+</body>
+</html>

@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import jakarta.validation.Valid;
 
 import io.swagger.v3.oas.annotations.Operation;
 import proyecto.entity.Cliente;
@@ -53,7 +54,7 @@ public class ClienteController {
 
 	@PostMapping
 	@Operation(summary = "Crear un nuevo cliente")
-	public ResponseEntity<String> saveCliente(@RequestBody Cliente newCliente) {
+	public ResponseEntity<String> saveCliente(@Valid @RequestBody Cliente newCliente) {
 		Cliente savedCliente = clienteService.save(newCliente);
 
 		if (savedCliente != null) {

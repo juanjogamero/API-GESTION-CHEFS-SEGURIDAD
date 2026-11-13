@@ -2,100 +2,82 @@ package proyecto.security;
 
 import java.util.Date;
 import java.util.Optional;
-
-import org.springframework.beans.factory.annotation.Autowired;
+import javax.crypto.SecretKey;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.annotation.Lazy;
-import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
-
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.security.Keys;
 import jakarta.servlet.http.HttpServletRequest;
 import proyecto.entity.Actor;
 import proyecto.service.ActorService;
-import proyecto.service.AdminService;
-import proyecto.service.ChefService;
-import proyecto.service.ClienteService;
 
 @Component
 public class JWTUtils {
+    private final ActorService actorService;
+    private final SecretKey key;
+    private final long expirationMillis;
 
-    @Autowired
-    private ActorService actorService;
-
-    @Autowired
-    @Lazy
-    private AdminService adminService;
-
-    @Autowired
-    @Lazy
-    private ClienteService clienteService;
-
-    @Autowired
-    @Lazy
-    private ChefService chefService;
-
-    @Value("${jwt.secret}")
-    private String JWT_FIRMA;
-
-    @Value("${jwt.expiration}")
-    private long EXTENCION_TOKEN;
+    public JWTUtils(ActorService actorService,
+                    @Value("${jwt.secret}") String secret,
+                    @Value("${jwt.expiration-ms:3600000}") long expirationMillis) {
+        this.actorService = actorService;
+        byte[] bytes = Decoders.BASE64.decode(secret);
+        if (bytes.length < 32) {
+            throw new IllegalArgumentException("JWT_SECRET debe contener al menos 32 bytes aleatorios codificados en Base64");
+        }
+        if (expirationMillis < 60000) {
+            throw new IllegalArgumentException("La duración mínima del JWT es de 60 segundos");
+        }
+        this.key = Keys.hmacShaKeyFor(bytes);
+        this.expirationMillis = expirationMillis;
+    }
 
     public String getToken(HttpServletRequest request) {
-        String tokenBearer = request.getHeader("Authorization");
-        if (StringUtils.hasText(tokenBearer) && tokenBearer.startsWith("Bearer ")) {
-            return tokenBearer.substring(7);
-        }
-        return null;
+        String header = request.getHeader("Authorization");
+        return StringUtils.hasText(header) && header.startsWith("Bearer ")
+            ? header.substring(7) : null;
     }
 
     public boolean validateToken(String token) {
         try {
-            Jwts.parser().setSigningKey(JWT_FIRMA).parseClaimsJws(token);
-            return true;
-        } catch (Exception e) {
-            throw new AuthenticationCredentialsNotFoundException("JWT ha experido o no es valido");
+            return StringUtils.hasText(Jwts.parser().verifyWith(key).build()
+                .parseSignedClaims(token).getPayload().getSubject());
+        } catch (JwtException | IllegalArgumentException e) {
+            return false;
         }
     }
 
     public String generateToken(Authentication authentication) {
-        String username = authentication.getName();
-        Date fechaActual = new Date();
-        Date fechaExpiracion = new Date(fechaActual.getTime() + EXTENCION_TOKEN);
-        String rol = authentication.getAuthorities().iterator().next().getAuthority();
-        String token = Jwts.builder().setSubject(username).setIssuedAt(fechaActual).setExpiration(fechaExpiracion)
-                .claim("rol", rol).signWith(SignatureAlgorithm.HS512, JWT_FIRMA).compact();
-        return token;
+        Date issued = new Date();
+        String authority = authentication.getAuthorities().stream()
+            .findFirst().orElseThrow().getAuthority();
+        return Jwts.builder()
+            .subject(authentication.getName())
+            .issuedAt(issued)
+            .expiration(new Date(issued.getTime() + expirationMillis))
+            .claim("rol", authority)
+            .signWith(key, Jwts.SIG.HS256)
+            .compact();
     }
 
     public String getUsernameOfToken(String token) {
-        return Jwts.parser().setSigningKey(JWT_FIRMA).parseClaimsJws(token).getBody().getSubject();
+        return Jwts.parser().verifyWith(key).build()
+            .parseSignedClaims(token).getPayload().getSubject();
     }
 
-    public <T> T userLogin() {
-        String username = SecurityContextHolder.getContext().getAuthentication().getName();
-        if (StringUtils.isEmpty(username)) {
+    @SuppressWarnings("unchecked")
+    public <T extends Actor> T userLogin() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || !StringUtils.hasText(auth.getName())) {
             return null;
         }
-        Optional<Actor> actorO = actorService.findByUsername(username);
-        if (!actorO.isPresent()) {
-            return null;
-        }
-        Actor actor = actorO.get();
-        switch (actor.getRol()) {
-            case ADMIN:
-                return (T) adminService.findByUsername(username).orElse(null);
-            case CHEF:
-                return (T) chefService.findByUsername(username).orElse(null);
-            case CLIENTE:
-                return (T) clienteService.findByUsername(username).orElse(null);
-            default:
-                return null;
-        }
+        Optional<Actor> actor = actorService.findByUsername(auth.getName());
+        if (actor.isEmpty() || actor.get().isBaneado()) return null;
+        return (T) actor.get();
     }
-
 }

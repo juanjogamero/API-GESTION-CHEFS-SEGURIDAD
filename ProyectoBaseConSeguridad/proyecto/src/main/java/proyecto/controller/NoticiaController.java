@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import jakarta.validation.Valid;
 
 import io.swagger.v3.oas.annotations.Operation;
 import proyecto.entity.Noticia;
@@ -39,7 +40,7 @@ public class NoticiaController {
 
     @PostMapping
     @Operation(summary = "Crear una nueva noticia")
-    public ResponseEntity<String> saveNoticia(@RequestBody Noticia newNoticia) {
+    public ResponseEntity<String> saveNoticia(@Valid @RequestBody Noticia newNoticia) {
         Noticia savedNoticia = noticiaService.save(newNoticia);
 
         if (savedNoticia != null) {
@@ -52,7 +53,7 @@ public class NoticiaController {
 
     @PutMapping("/{id}")
     @Operation(summary = "Actualizar una noticia existente")
-    public ResponseEntity<String> updateNoticia(@PathVariable int id, @RequestBody Noticia updatedNoticia) {
+    public ResponseEntity<String> updateNoticia(@PathVariable int id, @Valid @RequestBody Noticia updatedNoticia) {
         Noticia response = noticiaService.update(id, updatedNoticia);
 
         if (response != null) {

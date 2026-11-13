@@ -1,48 +1,34 @@
 package proyecto.service;
 
-import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
-
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
-
 import proyecto.entity.Actor;
 import proyecto.respository.ActorRepository;
 
 @Service
 public class ActorService implements UserDetailsService {
-	@Autowired
-	private ActorRepository actorRepository;
+    private final ActorRepository actorRepository;
+    public ActorService(ActorRepository actorRepository) { this.actorRepository = actorRepository; }
 
-	@Override
-	public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-		Optional<Actor> actorO = this.findByUsername(username);
-		if (actorO.isPresent()) {
-			Set<GrantedAuthority> authorities = new HashSet<GrantedAuthority>();
-			authorities.add(new SimpleGrantedAuthority(actorO.get().getRol().toString()));
-			User user = new User(actorO.get().getUsername(), actorO.get().getPassword(), authorities);
-			return user;
-		} else {
-			throw new UsernameNotFoundException("Username no encontrado");
-		}
-	}
+    @Override
+    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        Actor actor = findByUsername(username).orElseThrow(() ->
+            new UsernameNotFoundException("Cuenta no encontrada"));
+        if (actor.getRol() == null || actor.getPassword() == null) {
+            throw new UsernameNotFoundException("Cuenta inactiva");
+        }
+        return new User(actor.getUsername(), actor.getPassword(), !actor.isBaneado(),
+            true, true, true,
+            Set.of(new SimpleGrantedAuthority(actor.getRol().name())));
+    }
 
-	public Optional<Actor> findByUsername(String username) {
-		return actorRepository.findByUsername(username);
-	}
-	
-	public Optional<Actor> findById(int id) {
-		return actorRepository.findById(id);
-	}
-	
-	public Actor saveBasico(Actor a) {
-		return actorRepository.save(a);
-	}
+    public Optional<Actor> findByUsername(String username) { return actorRepository.findByUsername(username); }
+    public Optional<Actor> findById(int id) { return actorRepository.findById(id); }
+    public Actor saveBasico(Actor actor) { return actorRepository.save(actor); }
 }

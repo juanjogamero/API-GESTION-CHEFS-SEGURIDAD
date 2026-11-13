@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import jakarta.validation.Valid;
 
 import io.swagger.v3.oas.annotations.Operation;
 import proyecto.entity.Admin;
@@ -31,7 +32,7 @@ public class AdminController {
 
 	@PostMapping
 	@Operation(summary = "Crear un nuevo administrador")
-	public ResponseEntity<String> saveAdmin(@RequestBody Admin newAdmin) {
+	public ResponseEntity<String> saveAdmin(@Valid @RequestBody Admin newAdmin) {
 		Admin savedAdmin = adminService.save(newAdmin);
 
 		if (savedAdmin != null) {
