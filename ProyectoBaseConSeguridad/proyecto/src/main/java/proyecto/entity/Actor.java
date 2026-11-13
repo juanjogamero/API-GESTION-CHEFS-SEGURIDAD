@@ -9,6 +9,7 @@ import jakarta.persistence.Inheritance;
 import jakarta.persistence.InheritanceType;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.Pattern;
 import org.hibernate.validator.constraints.URL;
 
@@ -19,7 +20,7 @@ public abstract class Actor extends DomainEntity {
     private String username;
 
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
-    @NotBlank
+    @NotBlank @Size(min=12, message="La contraseña debe contener al menos 12 caracteres")
     private String password;
 
     @Enumerated(EnumType.STRING)
