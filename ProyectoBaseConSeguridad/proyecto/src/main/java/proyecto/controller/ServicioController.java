@@ -1,77 +1,45 @@
 package proyecto.controller;
 
 import java.util.List;
-import java.util.Optional;
-
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-
-import io.swagger.v3.oas.annotations.Operation;
+import org.springframework.web.bind.annotation.*;
 import proyecto.entity.Servicio;
 import proyecto.service.ServicioService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 @RestController
 @RequestMapping("/servicio")
+@Tag(name = "Servicios", description = "Contrataciones y valoraciones protegidas por rol")
 public class ServicioController {
+    private final ServicioService servicioService;
+    public ServicioController(ServicioService servicioService) { this.servicioService=servicioService; }
 
-	@Autowired
-	private ServicioService servicioService;
+    @PostMapping("/contratar/{chefId}")
+    @Operation(summary = "Contratar un chef activo para una fecha futura")
+    public ResponseEntity<String> contratarServicio(@PathVariable int chefId, @RequestBody Servicio servicio) {
+        Servicio guardado = servicioService.contratarServicio(servicio, chefId);
+        return guardado == null
+            ? ResponseEntity.status(HttpStatus.CONFLICT).body("Chef no disponible o fecha no válida")
+            : ResponseEntity.status(HttpStatus.CREATED).body("Servicio creado con ID: " + guardado.getId());
+    }
 
-	@Operation(summary = "Contratar un servicio")
-	@PostMapping("/contratar/{chefId}")
-	public ResponseEntity<String> contratarServicio(@PathVariable int chefId, @RequestBody Servicio servicio) {
-		Servicio servicioContratado = servicioService.contratarServicio(servicio, chefId);
+    @PutMapping("/puntuar/{servicioId}/{puntuacion}")
+    @Operation(summary = "Valorar con 1 a 5 estrellas un servicio propio que ya se realizó")
+    public ResponseEntity<String> puntuarServicio(@PathVariable int servicioId, @PathVariable int puntuacion) {
+        if (puntuacion < 1 || puntuacion > 5)
+            return ResponseEntity.badRequest().body("La puntuación debe estar entre 1 y 5");
+        Servicio servicio = servicioService.findById(servicioId).orElse(null);
+        if (servicio == null) return ResponseEntity.notFound().build();
+        return servicioService.puntuarServicio(servicio,puntuacion)
+            ? ResponseEntity.ok("Servicio valorado correctamente")
+            : ResponseEntity.status(HttpStatus.CONFLICT)
+                .body("Solo puedes valorar una vez un servicio propio ya realizado");
+    }
 
-		if (servicioContratado != null) {
-			return ResponseEntity.status(HttpStatus.CREATED)
-					.body("Servicio creado exitosamente con ID: " + servicioContratado.getId());
-		} else {
-			return ResponseEntity.badRequest()
-					.body("No se pudo contratar el servicio. El chef ya tiene un servicio ese día o no existe.");
-		}
-	}
-
-	@Operation(summary = "Puntuar un servicio")
-	@GetMapping("/puntuar/{servicioId}/{puntuacion}")
-	public ResponseEntity<String> puntuarServicio(@PathVariable int servicioId, @PathVariable int puntuacion) {
-		Optional<Servicio> servicio = servicioService.findById(servicioId);
-
-		if (servicio.isPresent()) {
-			if (puntuacion > 0 && puntuacion < 5) {
-				if (servicioService.puntuarServicio(servicio.get(), puntuacion)) {
-					return ResponseEntity.status(HttpStatus.CREATED)
-							.body("Servicio con ID: " + servicio.get().getId() + " puntuado correctamente");
-				} else {
-					return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-							.body("Se esta intentando puntuar un servicio no consumido");
-				}
-			} else {
-				return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-						.body("La puntuacion tiene que estar comprendidad entre 0 y 5");
-			}
-		} else {
-			return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
-		}
-	}
-
-	@Operation(summary = "Obtener todos los servicios ofrecidos por el chef logueado")
-	@GetMapping("/misServiciosChef")
-	public ResponseEntity<List<Servicio>> getAllByChefLogin() {
-		List<Servicio> servicios = servicioService.getAllByChefLogin();
-		return ResponseEntity.ok(servicios);
-	}
-	
-	@Operation(summary = "Obtener todos los servicios contratados por el cliente logueado")
-	@GetMapping("/misServiciosCliente")
-	public ResponseEntity<List<Servicio>> getAllByClienteLogin() {
-		List<Servicio> servicios = servicioService.getAllByClienteLogin();
-		return ResponseEntity.ok(servicios);
-	}
+    @GetMapping("/misServiciosChef")
+    public List<Servicio> getAllByChefLogin() { return servicioService.getAllByChefLogin(); }
+    @GetMapping("/misServiciosCliente")
+    public List<Servicio> getAllByClienteLogin() { return servicioService.getAllByClienteLogin(); }
 }
