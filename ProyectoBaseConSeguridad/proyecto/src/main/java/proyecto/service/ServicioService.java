@@ -1,14 +1,11 @@
 package proyecto.service;
 
-import java.sql.Date;
 import java.time.LocalDate;
+import java.util.Date;
 import java.util.List;
 import java.util.Optional;
-
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import proyecto.entity.Chef;
 import proyecto.entity.Cliente;
 import proyecto.entity.Servicio;
@@ -17,87 +14,81 @@ import proyecto.security.JWTUtils;
 
 @Service
 public class ServicioService {
-	@Autowired
-	private ServicioRepository servicioRepository;
+    private final ServicioRepository servicios;
+    private final ClienteService clientes;
+    private final ChefService chefs;
+    private final JWTUtils jwt;
 
-	@Autowired
-	private ClienteService clienteService;
+    public ServicioService(ServicioRepository servicios, ClienteService clientes,
+                           ChefService chefs, JWTUtils jwt) {
+        this.servicios=servicios; this.clientes=clientes; this.chefs=chefs; this.jwt=jwt;
+    }
 
-	@Autowired
-	private ChefService chefService;
+    public Optional<Servicio> findById(int id) { return servicios.findById(id); }
 
-	@Autowired
-	private JWTUtils JWTUtils;
+    @Transactional
+    public Servicio contratarServicio(Servicio solicitud, int chefId) {
+        if (solicitud == null || solicitud.getFechaServicio() == null
+            || !solicitud.getFechaServicio().isAfter(LocalDate.now())) return null;
 
-	public Optional<Servicio> findById(int id) {
-		return servicioRepository.findById(id);
-	}
+        Chef chef = chefs.findByIdForUpdate(chefId).orElse(null);
+        if (chef == null || !chef.isActivo() || chef.isBaneado()) return null;
 
-	public Servicio contratarServicio(Servicio servicio, int chefId) {
-		Servicio servicioBD = null;
+        Cliente cliente = jwt.userLogin();
+        if (cliente == null || cliente.isBaneado()) return null;
+        if (chef.getServiciosOfrecidos().stream()
+            .anyMatch(s -> solicitud.getFechaServicio().equals(s.getFechaServicio()))) return null;
 
-		Optional<Chef> chef = chefService.findById(chefId);
-		if (chef.isPresent()) {
-			if (!hayServiciosMismoDia(chef.get(), servicio)) {
-				servicio.setMomentoContratacion(Date.valueOf(LocalDate.now()));
-				servicio.setValoracionServicio(null);
-				servicioBD = servicioRepository.save(servicio);
+        // No confiar en las fechas, identidades ni valoraciones suministradas por el cliente.
+        Servicio servicio = new Servicio();
+        servicio.setFechaServicio(solicitud.getFechaServicio());
+        servicio.setComentario(solicitud.getComentario());
+        servicio.setMomentoContratacion(new Date());
+        servicio.setValoracionServicio(null);
+        Servicio guardado = servicios.save(servicio);
+        cliente.getServiciosContratados().add(guardado);
+        clientes.saveBasico(cliente);
+        chef.getServiciosOfrecidos().add(guardado);
+        chefs.saveBasico(chef);
+        return guardado;
+    }
 
-				Cliente clienteLogin = JWTUtils.userLogin();
-				clienteLogin.getServiciosContratados().add(servicioBD);
-				clienteService.saveBasico(clienteLogin);
+    @Transactional
+    public boolean puntuarServicio(Servicio referencia, int puntuacion) {
+        if (puntuacion < 1 || puntuacion > 5 || referencia == null) return false;
+        Servicio servicio = servicios.findById(referencia.getId()).orElse(null);
+        if (servicio == null || servicio.getFechaServicio() == null
+            || !servicio.getFechaServicio().isBefore(LocalDate.now())
+            || servicio.getValoracionServicio() != null) return false;
 
-				chef.get().getServiciosOfrecidos().add(servicioBD);
-				chefService.saveBasico(chef.get());
-			}
-		}
-		return servicioBD;
-	}
+        Cliente cliente = jwt.userLogin();
+        if (cliente == null || !cliente.getServiciosContratados().stream()
+            .anyMatch(s -> s.getId() == servicio.getId())) return false;
+        Chef chef = chefs.findByServicioId(servicio.getId());
+        if (chef == null) return false;
 
-	private boolean hayServiciosMismoDia(Chef c, Servicio s) {
-		boolean res = false;
-		for (Servicio servicio : c.getServiciosOfrecidos()) {
-			if (servicio.getFechaServicio().equals(s.getFechaServicio())) {
-				res = true;
-				break;
-			}
-		}
-		return res;
-	}
+        servicio.setValoracionServicio(puntuacion);
+        servicios.save(servicio);
+        double total=0; int num=0;
+        for (Servicio s : chef.getServiciosOfrecidos()) {
+            if (s.getValoracionServicio() != null) {
+                total += s.getValoracionServicio(); num++;
+            }
+        }
+        chef.setValoracionChef(num == 0 ? 0.0 : total / num);
+        // Solo guardar la media, nunca volver a cifrar una contraseña ya cifrada.
+        chefs.saveBasico(chef);
+        return true;
+    }
 
-	@Transactional
-	public boolean puntuarServicio(Servicio servicio, int puntuacion) {
-		boolean res = false;
-		int suma = 0;
-		int numValoraciones = 0;
-		Cliente clienteLogin = JWTUtils.userLogin();
-
-		if (clienteLogin.getServiciosContratados().contains(servicio)) {
-			servicio.setValoracionServicio(puntuacion);
-			servicioRepository.save(servicio);
-
-			Chef c = chefService.findByServicioId(servicio.getId());
-			for (Servicio s : c.getServiciosOfrecidos()) {
-				if (s.getValoracionServicio() != null) {
-					suma = suma + s.getValoracionServicio();
-					numValoraciones++;
-				}
-			}
-			c.setValoracionChef((double) suma / numValoraciones);
-			chefService.save(c);
-
-			res = true;
-		}
-		return res;
-	}
-
-	public List<Servicio> getAllByChefLogin() {
-		Chef chefLogin = JWTUtils.userLogin();
-		return chefLogin.getServiciosOfrecidos();
-	}
-	
-	public List<Servicio> getAllByClienteLogin() {
-		Cliente clienteLogin = JWTUtils.userLogin();
-		return clienteLogin.getServiciosContratados();
-	}
+    @Transactional(readOnly=true)
+    public List<Servicio> getAllByChefLogin() {
+        Chef chef = jwt.userLogin();
+        return chef == null ? List.of() : List.copyOf(chef.getServiciosOfrecidos());
+    }
+    @Transactional(readOnly=true)
+    public List<Servicio> getAllByClienteLogin() {
+        Cliente cliente = jwt.userLogin();
+        return cliente == null ? List.of() : List.copyOf(cliente.getServiciosContratados());
+    }
 }
