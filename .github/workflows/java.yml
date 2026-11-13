@@ -1,0 +1,28 @@
+name: Java · Seguridad API
+on:
+  push:
+    branches: [main, feature/seguridad-portfolio-profesional]
+    paths:
+      - "ProyectoBaseConSeguridad/proyecto/**"
+      - ".github/workflows/java.yml"
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+          cache-dependency-path: ProyectoBaseConSeguridad/proyecto/pom.xml
+      - name: Compilar y ejecutar pruebas
+        working-directory: ProyectoBaseConSeguridad/proyecto
+        run: bash ./mvnw --batch-mode verify
